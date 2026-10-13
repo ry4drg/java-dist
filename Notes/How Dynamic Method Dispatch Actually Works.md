@@ -43,9 +43,15 @@ So the bytecode says: *"call `speak` on whatever object is on the stack, resolve
 Every class has a **constant pool** — a table of symbolic references (to classes, methods, fields, strings, etc.). When the compiler needs to refer to `Animal.speak`, it adds an entry to this pool and emits the *index* of that entry into the bytecode.
 
 At runtime, the JVM must turn each symbolic entry into a **direct reference** — an actual pointer to a class, method, or field in memory. This resolution step is exactly what **dynamic linking** does, and it's normally deferred until the entry is first used.
+
+Heed:
+- *"deferred until the entry is first used"* means: the JVM does not resolve a constant-pool entry when the class is loaded. It waits until the exact moment some bytecode instruction actually needs that entry, and only then does the resolution work.
 # How Dynamic Method Dispatch Actually Works
 
 Let me walk through the whole mechanism, from the bytecode the compiler emits to the exact steps the JVM takes at runtime. The key structures are the **constant pool**, the **vtable**, and the `invokevirtual` instruction.
+
+Heed:
+- **constant pool**, the **vtable**, and the `invokevirtual` instruction. Are further discussed below.
 
 ## Step 1: What the Compiler Produces
 
@@ -73,6 +79,10 @@ invokevirtual #7             ; #7 = Methodref Animal.speak:()V
 
 Notice:
 - The compiler **does not know** the object is a `Dog`. It only sees the **static type** `Animal`.
+
+  Heed:
+  - *"Static type"* mantionned just above means the type the compiler knows about, based on how the variable is declared. It's fixed in the source code and never changes. The word "static" here means "determined at compile time" — it has nothing to do with the static keyword.
+
 - It writes `invokevirtual` with a **symbolic reference** to `Animal.speak` — a name, not a memory address.
 - The `#7` is an index into the class's **constant pool**, where the entry looks like:
   ```
@@ -82,6 +92,9 @@ Notice:
   ```
 
 So the bytecode says: *"call `speak` on whatever object is on the stack, resolved against class `Animal`."* The `Animal` part is only a **hint** used for verification and as the starting point for lookup — it is **not** the method that necessarily runs.
+
+Heed:
+- *"Resolved against class `Animal`"* means: when the JVM turns the symbolic reference `Animal.speak:()V` into something concrete, it does that lookup using `Animal` as the reference class — `Animal` is the starting point and frame of reference for the search. The word "against" means "using as the basis."
 
 ## Step 2: The Class Constant Pool
 
@@ -93,7 +106,12 @@ At runtime, the JVM must turn each symbolic entry into a **direct reference** �
 
 Here's the key structure that makes dispatch fast.
 
-Every class that the JVM loads gets a **vtable** — an array of pointers to the actual implementations of its virtual methods. Method slots are assigned consistently across the class hierarchy:
+Every class that the JVM loads gets a **vtable** — an array of pointers to the actual implementations of its virtual methods. 
+
+Heed:
+- [What Is a Virtual Method](What%20Is%20a%20Virtual%20Method.md)
+
+Method slots are assigned consistently across the class hierarchy:
 
 ```
 Animal's vtable:              Dog's vtable:
